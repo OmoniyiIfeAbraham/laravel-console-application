@@ -12,4 +12,8 @@ class TodoUserModel extends Model
     protected $table = 'todo_users';
 
     protected $fillable = ['username', 'email', 'password'];
+
+    public function todos() {
+        return $this->hasMany(TodoModel::class, 'todo_users_id');
+    }
 }

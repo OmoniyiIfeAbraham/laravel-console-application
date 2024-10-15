@@ -2,10 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Models\TodoModel;
 use App\Models\TodoUserModel;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 
+use function PHPUnit\Framework\isEmpty;
 use function Termwind\ask;
 
 class TodoOperations extends Command
@@ -31,12 +33,15 @@ class TodoOperations extends Command
     {
         $exit = false;
         $loggedIn = false;
+        $User = [];
 
         while (!$exit) {
+            if (!$loggedIn) {
+                $this->info('Select an operation to perform');
+            }
             $this->info('0. Exit');
 
             if (!$loggedIn) {
-                $this->info('Select an operation to perform');
                 $this->info('1. Register');
                 $this->info('2. Login');
                 $choice = $this->ask('Enter your choice (0-2)');
@@ -46,7 +51,7 @@ class TodoOperations extends Command
                         $this->Register();
                         break;
                     case 2:
-                        $this->Login($loggedIn);
+                        $this->Login($loggedIn, $User);
                         break;
                     case 0:
                         $this->info('Exiting...');
@@ -66,19 +71,19 @@ class TodoOperations extends Command
 
                 switch ($choice) {
                     case 4:
-                        $this->info('Create operation');
+                        $this->Create($User);
                         // Implement Create logic here
                         break;
                     case 5:
-                        $this->info('Read operation');
+                        $this->Read();
                         // Implement Read logic here
                         break;
                     case 6:
-                        $this->info('Update operation');
+                        $this->Update();
                         // Implement Update logic here
                         break;
                     case 7:
-                        $this->info('Delete operation');
+                        $this->Delete();
                         // Implement Delete logic here
                         break;
                     case 0:
@@ -119,7 +124,7 @@ class TodoOperations extends Command
     }
 
     // Login function
-    protected function Login(&$loggedIn)
+    protected function Login(&$loggedIn, &$User)
     {
         $email = $this->ask('Enter email:');
         $password = $this->ask('Enter password:');
@@ -130,6 +135,7 @@ class TodoOperations extends Command
             if (Hash::check($password, $user->password)) {
                 $this->info('Login Successful!');
                 $loggedIn = true;
+                $User = $user;
             } else {
                 $this->error('Incorrect Password!');
             }
@@ -138,7 +144,81 @@ class TodoOperations extends Command
         }
     }
 
-    protected function Create() {
-        
+    protected function Create(&$User)
+    {
+        $title = $this->ask('Enter title');
+        $description = $this->ask('Enter description');
+        $id = $User->id;
+
+        $this->info($id);
+
+
+        TodoModel::create([
+            'title' => $title,
+            'description' => $description,
+            'todo_users_id' => $id
+        ]);
+
+        $this->info('Item created successfully!');
+    }
+
+    protected function Read()
+    {
+        $todos = TodoModel::all();
+
+        if ($todos->isEmpty()) {
+            $this->info('There are no Items');
+            return;
+        }
+
+        $this->table(['ID', 'Title', 'Description', 'UserID', 'CreatedAt', 'UpdatedAt'], $todos->toArray());
+    }
+
+    protected function Update()
+    {
+        $this->Read();
+
+        $id = $this->ask('Enter the ID of the Item to Update');
+        $item = TodoModel::where('id', $id)->first();
+
+        $this->info($item);
+
+        if (!$item) {
+            $this->info('Item not found');
+            return;
+        }
+
+        $title = $this->ask('Enter title (Leave blank to keep current title) ', $item->title);
+        $description = $this->ask('Enter description (Leave blank to keep current description) ', $item->description);
+
+        $item->update([
+            'title' => $title ?: $item->title,
+            'description' => $description ?: $item->description,
+        ]);
+
+        $this->info('Item updated successfully');
+    }
+
+    protected function Delete()
+    {
+        $this->Read();
+
+        $id = $this->ask('Enter the ID of the item you want to delete');
+        $item = TodoModel::where('id', $id)->first();
+
+        if (!$item) {
+            $this->info('Item not found.');
+            return;
+        }
+
+        $confirm = $this->ask('Do you really want to delete? (yes/no)');
+
+        if (strtolower($confirm) !== 'yes') {
+            return;
+        } else {
+            $item->delete();
+
+            $this->info('Item deleted Successfully!');
+        }
     }
 }
